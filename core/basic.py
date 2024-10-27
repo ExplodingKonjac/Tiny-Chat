@@ -1,7 +1,6 @@
 import curses
 import typing
 import wcwidth
-import keyboard
 
 from typing import Sequence
 
@@ -21,20 +20,24 @@ def drawText(text_seq:Sequence[str|int],width:int)->curses.window:
 	cur_attr=0
 	cur_y=0
 	cur_x=0
+
 	for elem in text_seq:
 		if isinstance(elem,str):
 			for ch in elem:
 				wc=wcwidth.wcwidth(ch)
+
 				if ch=='\n' or cur_x+wc>width:
 					cur_y+=1
 					cur_x=0
 					if cur_y>=pad.getmaxyx()[0]:
 						pad.resize(cur_y*2,width+1)
+
 				if ch!='\n':
 					pad.addch(cur_y,cur_x,ch,cur_attr)
 					cur_x+=wc
 		else:
 			cur_attr=elem
+
 	if cur_x==width:
 		cur_y+=1
 	pad.resize(cur_y+1,width)
@@ -43,9 +46,11 @@ def drawText(text_seq:Sequence[str|int],width:int)->curses.window:
 def getCursorPos(text_seq:Sequence[str],offset:int,width:int)->tuple[int,int]:
 	cur_x=0
 	cur_y=0
+
 	for elem in text_seq:
 		if not isinstance(elem,str):
 			continue
+
 		for ch in elem:
 			if ch=='\n':
 				cur_y+=1
@@ -59,7 +64,9 @@ def getCursorPos(text_seq:Sequence[str],offset:int,width:int)->tuple[int,int]:
 			if cur_x==width:
 				cur_y+=1
 				cur_x=0
+
 			offset-=1
 			if offset==0:
 				return (cur_y,cur_x)
+
 	return (cur_y,cur_x)
