@@ -51,9 +51,12 @@ class Display:
 		while self.actual_height+dt_height>tmp:
 			tmp*=2
 		self.pad.resize(tmp,self.width)
-
 		new_pad.overwrite(self.pad,0,0,self.actual_height,0,self.actual_height+dt_height-1,self.width-1)
+
+		is_latest=(self.actual_height<self.height or self.begin_row+self.height==self.actual_height)
 		self.actual_height+=dt_height
+		if is_latest:
+			self.begin_row=max(0,self.actual_height-self.height)
 
 	def move(self,pos_y:int,pos_x:int):
 		self.pos_y=pos_y

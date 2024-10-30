@@ -1,12 +1,12 @@
 import curses
-import typing
 import wcwidth
+import socket
 
 from typing import Sequence
 
 color_dict:dict[tuple[int,int],int]={}
 
-def colorAttr(fg:int,bg:int)->int:
+def color(fg:int,bg:int)->int:
 	if (fg,bg) in color_dict.keys():
 		return curses.color_pair(color_dict[(fg,bg)])
 	else:
@@ -25,13 +25,11 @@ def drawText(text_seq:Sequence[str|int],width:int)->curses.window:
 		if isinstance(elem,str):
 			for ch in elem:
 				wc=wcwidth.wcwidth(ch)
-
 				if ch=='\n' or cur_x+wc>width:
 					cur_y+=1
 					cur_x=0
 					if cur_y>=pad.getmaxyx()[0]:
 						pad.resize(cur_y*2,width+1)
-
 				if ch!='\n':
 					pad.addch(cur_y,cur_x,ch,cur_attr)
 					cur_x+=wc
@@ -50,7 +48,6 @@ def getCursorPos(text_seq:Sequence[str],offset:int,width:int)->tuple[int,int]:
 	for elem in text_seq:
 		if not isinstance(elem,str):
 			continue
-
 		for ch in elem:
 			if ch=='\n':
 				cur_y+=1
@@ -64,9 +61,26 @@ def getCursorPos(text_seq:Sequence[str],offset:int,width:int)->tuple[int,int]:
 			if cur_x==width:
 				cur_y+=1
 				cur_x=0
-
 			offset-=1
 			if offset==0:
 				return (cur_y,cur_x)
 
 	return (cur_y,cur_x)
+
+def readSocket(s:socket.socket)->bytes:
+	length_bytes=s.recv(4)
+	if len(length_bytes)!=4:
+		return b''
+	else:
+		rest=int.from_bytes(length_bytes)
+		data=b''
+		while rest>0:
+			new_data=s.recv(rest)
+			rest-=len(new_data)
+			data+=new_data
+		return data
+
+def sendSocket(s:socket.socket,data:bytes):
+	length_bytes=len(data).to_bytes(4)
+	s.send(length_bytes)
+	s.send(data)
