@@ -4,8 +4,6 @@ import socket
 import select
 import threading
 import time
-import hashlib
-import getpass
 
 from .display import Display
 from .editor import Editor
@@ -15,16 +13,17 @@ MSG_SYSTEM=1
 MSG_USER=2
 MSG_ADMIN=3
 MSG_EXIT=4
+MSG_GRANTED=5
 
 def messageHeader(msg_type:int,msg_sender:str):
 	time_str=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-	ret=[0,msg_sender,color(curses.COLOR_CYAN,curses.COLOR_BLACK),time_str]
+	ret=[curses.A_BOLD,msg_sender,color(curses.COLOR_CYAN,curses.COLOR_BLACK),' ',time_str]
 	if msg_type==MSG_SYSTEM:
-		ret[0]=color(curses.COLOR_GREEN,curses.COLOR_BLACK)
+		ret[0]|=color(curses.COLOR_MAGENTA,curses.COLOR_BLACK)
 	elif msg_type==MSG_USER:
-		ret[0]=color(curses.COLOR_YELLOW,curses.COLOR_BLACK)
+		ret[0]|=color(curses.COLOR_YELLOW,curses.COLOR_BLACK)
 	elif msg_type==MSG_ADMIN:
-		ret[0]=color(curses.COLOR_RED,curses.COLOR_BLACK)
+		ret[0]|=color(curses.COLOR_RED,curses.COLOR_BLACK)
 	return ret
 
 class BaseConsole:
@@ -37,7 +36,9 @@ class BaseConsole:
 		self.display=Display(stdscr,1,1,self.height-1,self.width-2)
 		self.in_edit_mode=False
 		self.running=True
-		self.secretkey=b''
+		self.error_msg=None
+
+		self.window_lock=threading.Lock()
 
 	def refresh(self):
 		self.stdscr.erase()
@@ -58,18 +59,25 @@ class BaseConsole:
 		while self.running:
 			key=self.stdscr.get_wch()
 
-			if key=='q':
+			if key=='q' and not self.in_edit_mode:
 				self.running=False
 				break
 
 			if key==curses.KEY_RESIZE:
 				self.height,self.width=self.stdscr.getmaxyx()
 				if self.height>=4:
-					self.editor.resize(self.height//2,self.width)
-					self.editor.move(self.height,0)
-					self.display.resize(self.height-1,self.width-2)
-					self.display.move(1,1)
+					with self.window_lock:
+						self.editor.resize(self.height//2,self.width)
+						self.editor.move(self.height,0)
+						self.display.resize(self.height-1,self.width-2)
+						self.display.move(1,1)
 				self.refresh()
+
+			elif key in (':','/'):
+				self.in_edit_mode=True
+				self.editor.initEditor(key)
+				self.refresh()
+				curses.curs_set(1)
 
 			elif key==curses.KEY_MOUSE or not self.in_edit_mode:
 				self.display.sendKey(key)
@@ -87,14 +95,8 @@ class BaseConsole:
 							self.sendCommand(ret)
 				self.refresh()
 
-			elif key in (':','/'):
-				self.in_edit_mode=True
-				self.editor.initEditor(key)
-				self.refresh()
-				curses.curs_set(1)
-
 	@abc.abstractmethod
-	def start(self):...
+	def start(self)->str|None:...
 
 	@abc.abstractmethod
 	def sendMessage(self,msg:str):...
@@ -108,7 +110,6 @@ class ServerConsole(BaseConsole):
 
 		self.clients:dict[str,socket.socket]={}
 		self.clients_lock=threading.Lock()
-		self.display_lock=threading.Lock()
 
 	def broadcast(self,msg_type:int,msg_sender:str,msg:str,exclude:None|socket.socket=None):
 		data=msg_type.to_bytes(1)+(msg_sender+'\0'+msg).encode()
@@ -117,151 +118,173 @@ class ServerConsole(BaseConsole):
 				if s==exclude:
 					continue
 				sendSocket(s,data)
-		
-		with self.display_lock:
+
+		with self.window_lock:
 			self.display.pushText(messageHeader(msg_type,msg_sender))
 			self.display.pushText([msg,'\n'])
+			self.refresh()
 
 	def handleClient(self,client_socket:socket.socket,client_address):
 		username=''
+		joined=False
 		try:
 			if len(self.clients)+1==self.args.capacity:
 				sendSocket(client_socket,"access denied: out of room capacity".encode())
 				return
-			sendSocket(client_socket,"access granted (0)".encode())
+			sendSocket(client_socket,MSG_GRANTED.to_bytes(1))
 
 			client_key=readSocket(client_socket)
-			if client_key!=self.secretkey:
+			if client_key!=self.args.secretkey:
 				sendSocket(client_socket,"access denied: incorrect password".encode())
 				return
-			sendSocket(client_socket,"access granted (1)".encode())
-	
+			sendSocket(client_socket,MSG_GRANTED.to_bytes(1))
+
 			username=readSocket(client_socket).decode()
 			with self.clients_lock:
 				if username in self.clients:
 					sendSocket(client_socket,"access denied: duplicated username".encode())
 					return
 				self.clients[username]=client_socket
-			sendSocket(client_socket,"access granted (2)".encode())
+			sendSocket(client_socket,MSG_GRANTED.to_bytes(1))
 
-			while True:
-				readable,_,_=select.select([client_socket],[],[])
+			joined=True
+			self.broadcast(MSG_SYSTEM,"System",f"{username} has join the room.",client_socket)
+
+			while self.running:
+				readable,_,_=select.select([client_socket],[],[],0.1)
 				if readable:
 					msg=readSocket(client_socket).decode()
 					if not msg:
 						break
-					self.broadcast(MSG_USER,username,msg)
-
-				time.sleep(0.05)
+					self.broadcast(MSG_USER,username,msg,client_socket)
 		except:
-			return
+			sendSocket(client_socket,MSG_EXIT.to_bytes(1))
 		finally:
-			if username and username in self.clients:
+			if joined:
 				with self.clients_lock:
 					self.clients.pop(username)
-				self.broadcast(MSG_SYSTEM,"System",f"{username} has left the room.")
+				self.broadcast(MSG_SYSTEM,"System",f"{username} has left the room.",client_socket)
 
 			client_socket.close()
-			sendSocket(client_socket,MSG_EXIT.to_bytes(1))
+
+	def serverLoop(self,server_socket:socket.socket):
+		threads=[]
+		try:
+			server_socket.listen(5)
+			while self.running:
+				readable,_,_=select.select([server_socket],[],[],0.1)
+				if readable:
+					client_socket,client_address=server_socket.accept()
+					thread=threading.Thread(target=self.handleClient,args=(client_socket,client_address))
+					thread.start()
+					threads.append(thread)
+
+		except Exception as e:
+			self.error_msg=', '.join(map(str,e.args))
+		finally:
+			self.running=False
+			for thread in threads:
+				thread.join()
 
 	def start(self):
 		try:
-			raw_password=getpass.getpass("Please set the password (or leave it empty): ")
-			self.secretkey=hashlib.sha256(raw_password.encode()).digest()
+			server_socket=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+			server_socket.bind(('localhost',self.args.port))
+			self.args.port=server_socket.getsockname()[1]
 
-			server=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-			server.bind(self.args.port)
-			self.args.port=server.getsockname()[1]
-
-			with self.display_lock:
+			with self.window_lock:
 				self.display.pushText(messageHeader(MSG_SYSTEM,"System"))
 				self.display.pushText([f"Room {self.args.name} has opened on port {self.args.port}."])
 				self.display.pushText([])
+				self.refresh()
 
-			self.stdscr.refresh()
-			key_event_loop=threading.Thread(target=self.keyEventLoop)
-			key_event_loop.start()
+			server_thread=threading.Thread(target=self.serverLoop,args=(server_socket,))
+			server_thread.start()
 
-			server.listen(5)
-			while self.running:
-				client_socket,client_address=server.accept()
-				thread=threading.Thread(target=self.handleClient,args=(client_socket,client_address))
-				thread.start()
+			self.keyEventLoop()
+			server_thread.join()
 
 		except Exception as e:
-			curses.endwin()
-			print(f"error: {e.args[0]}")
+			self.error_msg=', '.join(map(str,e.args))
 		finally:
 			self.running=False
 
-
 	def sendMessage(self,msg:str):
 		self.broadcast(MSG_ADMIN,self.args.username,msg)
-		with self.display_lock:
+		with self.window_lock:
 			self.display.scrollDown(2**30)
+			self.refresh()
 
 	def sendCommand(self,cmd:str):
 		pass
 
 class ClientConsole(BaseConsole):
-	def __init__(self,stdscr:curses._CursesWindow,args):
+	def __init__(self,stdscr:curses.window,args):
 		super().__init__(stdscr,args)
 
 		self.client_socket:socket.socket=socket.socket()
+		self.window_lock=threading.Lock()
 
-		self.display_lock=threading.Lock()
+	def clientLoop(self,client_socket:socket.socket):
+		try:
+			while self.running:
+				readable,_,_=select.select([client_socket],[],[],0.1)
+				if readable:
+					data=readSocket(client_socket)
+					if not data or data[0]==MSG_EXIT:
+						self.error_msg="room closed or unable to connect to host"
+						return
 
+					msg_sender,msg=data[1:].decode().split('\0')
+					with self.window_lock:
+						self.display.pushText(messageHeader(data[0],msg_sender))
+						self.display.pushText([msg,'\n'])
+						self.refresh()
+
+		except Exception as e:
+			self.error_msg=', '.join(map(str,e.args))
+		finally:
+			self.running=False
+	
 	def start(self):
 		try:
-			raw_password=getpass.getpass("Please enter the password (or leave it empty): ")
-			self.secretkey=hashlib.sha256(raw_password.encode()).digest()
-
 			client_socket=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 			client_socket.connect(self.args.address)
 			self.client_socket=client_socket
 
-			res=readSocket(client_socket).decode()
-			if res!="access granted (0)":
-				raise Exception(res)
+			res=readSocket(client_socket)
+			if not res or res[0]!=MSG_GRANTED:
+				self.error_msg=res.decode()
+				return
 
-			sendSocket(client_socket,self.secretkey)
-			res=readSocket(client_socket).decode()
-			if res!="access granted (1)":
-				raise Exception(res)
+			sendSocket(client_socket,self.args.secretkey)
+			res=readSocket(client_socket)
+			if not res or res[0]!=MSG_GRANTED:
+				self.error_msg=res.decode()
+				return
 
 			sendSocket(client_socket,self.args.username.encode())
-			res=readSocket(client_socket).decode()
-			if res!="access granted (2)":
-				raise Exception(res)
+			res=readSocket(client_socket)
+			if not res or res[0]!=MSG_GRANTED:
+				self.error_msg=res.decode()
+				return
 
-			self.stdscr.refresh()
-			key_event_loop=threading.Thread(target=self.keyEventLoop)
-			key_event_loop.start()
+			client_thread=threading.Thread(target=self.clientLoop,args=(client_socket,))
+			client_thread.start()
 
-			while self.running:
-				readable,_,_=select.select([client_socket],[],[])
-				if readable:
-					data=readSocket(client_socket)
-					if data[0]==MSG_EXIT:
-						break
-					else:
-						msg_sender,msg=data[1:].decode().split('\0')
-						with self.display_lock:
-							self.display.pushText(messageHeader(data[0],msg_sender))
-							self.display.pushText([msg,'\n'])
-
-				time.sleep(0.05)
+			self.keyEventLoop()
+			client_thread.join()
 
 		except Exception as e:
-			curses.endwin()
-			print(f"error: {e.args[0]}")
+			self.error_msg=', '.join(map(str,e.args))
 		finally:
 			self.running=False
 	
 	def sendMessage(self,msg:str):
-		with self.display_lock:
+		with self.window_lock:
 			self.display.pushText(messageHeader(MSG_USER,self.args.username))
 			self.display.pushText([msg,'\n'])
+			self.refresh()
 
 		sendSocket(self.client_socket,msg.encode())
 
