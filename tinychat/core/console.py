@@ -12,8 +12,9 @@ from .basic import *
 MSG_SYSTEM=1
 MSG_USER=2
 MSG_ADMIN=3
-MSG_EXIT=4
-MSG_GRANTED=5
+MSG_SELF=4
+MSG_EXIT=5
+MSG_GRANTED=6
 
 def messageHeader(msg_type:int,msg_sender:str):
 	time_str=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
@@ -24,6 +25,8 @@ def messageHeader(msg_type:int,msg_sender:str):
 		ret[0]|=color(curses.COLOR_YELLOW,curses.COLOR_BLACK)
 	elif msg_type==MSG_ADMIN:
 		ret[0]|=color(curses.COLOR_RED,curses.COLOR_BLACK)
+	elif msg_type==MSG_SELF:
+		ret[0]|=color(curses.COLOR_GREEN,curses.COLOR_BLACK)
 	return ret
 
 class BaseConsole:
@@ -56,12 +59,18 @@ class BaseConsole:
 		self.stdscr.refresh()
 
 	def keyEventLoop(self):
+		self.stdscr.nodelay(True)
 		while self.running:
-			key=self.stdscr.get_wch()
-
-			if key=='q' and not self.in_edit_mode:
-				self.running=False
-				break
+			key=-1
+			try:
+				while self.running:
+					key=self.stdscr.get_wch()
+					if key==-1:
+						time.sleep(0.1)
+					else:
+						break
+			except curses.error:
+				continue
 
 			if key==curses.KEY_RESIZE:
 				self.height,self.width=self.stdscr.getmaxyx()
@@ -71,7 +80,7 @@ class BaseConsole:
 						self.editor.move(self.height,0)
 						self.display.resize(self.height-1,self.width-2)
 						self.display.move(1,1)
-				self.refresh()
+					self.refresh()
 
 			elif key in (':','/'):
 				self.in_edit_mode=True
@@ -102,7 +111,9 @@ class BaseConsole:
 	def sendMessage(self,msg:str):...
 
 	@abc.abstractmethod
-	def sendCommand(self,cmd:str):...
+	def sendCommand(self,cmd:str):
+		if cmd=="quit":
+			self.running=False
 
 class ServerConsole(BaseConsole):
 	def __init__(self,stdscr:curses.window,args):
@@ -141,7 +152,7 @@ class ServerConsole(BaseConsole):
 
 			username=readSocket(client_socket).decode()
 			with self.clients_lock:
-				if username in self.clients:
+				if username in self.clients or username==self.args.username:
 					sendSocket(client_socket,"access denied: duplicated username".encode())
 					return
 				self.clients[username]=client_socket
@@ -189,7 +200,7 @@ class ServerConsole(BaseConsole):
 	def start(self):
 		try:
 			server_socket=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-			server_socket.bind(('localhost',self.args.port))
+			server_socket.bind(('0.0.0.0',self.args.port))
 			self.args.port=server_socket.getsockname()[1]
 
 			with self.window_lock:
@@ -214,9 +225,6 @@ class ServerConsole(BaseConsole):
 		with self.window_lock:
 			self.display.scrollDown(2**30)
 			self.refresh()
-
-	def sendCommand(self,cmd:str):
-		pass
 
 class ClientConsole(BaseConsole):
 	def __init__(self,stdscr:curses.window,args):
@@ -282,11 +290,8 @@ class ClientConsole(BaseConsole):
 	
 	def sendMessage(self,msg:str):
 		with self.window_lock:
-			self.display.pushText(messageHeader(MSG_USER,self.args.username))
+			self.display.pushText(messageHeader(MSG_SELF,self.args.username))
 			self.display.pushText([msg,'\n'])
 			self.refresh()
 
 		sendSocket(self.client_socket,msg.encode())
-
-	def sendCommand(self,cmd:str):
-		pass

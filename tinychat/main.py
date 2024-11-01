@@ -21,7 +21,7 @@ def parseCapacity(value:str)->int:
 	except ValueError:
 		raise argparse.ArgumentTypeError("capacity should be an integer larger than 1")
 
-def main(stdscr:curses.window,args):
+def cursesMain(stdscr:curses.window,args):
 	curses.mousemask(curses.ALL_MOUSE_EVENTS)
 	curses.curs_set(0)
 	curses.echo(False)
@@ -36,7 +36,7 @@ def main(stdscr:curses.window,args):
 	con.start()
 	return con.error_msg
 
-if __name__=="__main__":
+def main():
 	parser=argparse.ArgumentParser()
 	subparsers=parser.add_subparsers(dest='command',help="subcommands",required=True)
 
@@ -55,6 +55,9 @@ if __name__=="__main__":
 	args.secretkey=hashlib.sha256(raw_password.encode()).digest()
 	del raw_password
 
-	error_msg=curses.wrapper(main,args)
+	error_msg=curses.wrapper(cursesMain,args)
 	if error_msg:
 		print(f"error: {error_msg}")
+
+if __name__=="__main__":
+	main()
