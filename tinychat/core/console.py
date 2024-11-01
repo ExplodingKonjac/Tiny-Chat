@@ -59,24 +59,18 @@ class BaseConsole:
 		self.stdscr.refresh()
 
 	def keyEventLoop(self):
-		self.stdscr.nodelay(True)
+		# self.stdscr.timeout(50)
 		while self.running:
-			key=-1
 			try:
-				while self.running:
-					key=self.stdscr.get_wch()
-					if key==-1:
-						time.sleep(0.1)
-					else:
-						break
+				key=self.stdscr.get_wch()
 			except curses.error:
 				continue
 
 			if key==curses.KEY_RESIZE:
 				self.height,self.width=self.stdscr.getmaxyx()
-				if self.height>=4:
-					with self.window_lock:
-						self.editor.resize(self.height//2,self.width)
+				with self.window_lock:
+					if self.height>=4:
+						self.editor.resize(self.height//2-1,self.width)
 						self.editor.move(self.height,0)
 						self.display.resize(self.height-1,self.width-2)
 						self.display.move(1,1)

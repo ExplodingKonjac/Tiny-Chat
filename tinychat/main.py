@@ -1,7 +1,7 @@
 import curses
 import argparse
 import hashlib
-import getpass
+import signal
 
 import core
 
@@ -37,6 +37,8 @@ def cursesMain(stdscr:curses.window,args):
 	return con.error_msg
 
 def main():
+	signal.signal(signal.SIGINT,signal.SIG_IGN)
+
 	parser=argparse.ArgumentParser()
 	subparsers=parser.add_subparsers(dest='command',help="subcommands",required=True)
 
