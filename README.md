@@ -1,31 +1,36 @@
-# readme
+## 安装
 
-## readme
+将项目 clone 下来，进入项目根目录，运行命令：
 
-### readme
+```
+pip install .
+```
 
-#### readme
+也可以通过设置 pip 选项来更改安装位置。该命令会安装可执行文件 `tinychat`，可能需要根据可执行文件的安装路径设置 PATH。
 
-*readme*
 
-**readme**
+注意：在 Windows 下，需要先安装 `windows-curses` 包：
 
-***readme***
+```
+pip install windows-curses
+```
 
-~~readme~~
+## 使用
 
-* readme
-* readme
+用下面命令查看帮助：
 
-1. readme
-2. readme
+```
+tinychat --help
+```
 
----
+对于具体的 `subcommand`，这样查看帮助：
 
-read
+```
+tinychat subcommand --help
+```
 
----
+进入 chat 界面之后，键入 `:` 后可以输入消息，键入 `/` 后可以输入命令（注意要在英文输入状态键入）。
 
-me
+### 命令
 
----
+* `/quit`：退出程序。

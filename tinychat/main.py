@@ -3,7 +3,7 @@ import argparse
 import hashlib
 import signal
 
-import core
+from .core import *
 
 def parseAddress(value:str)->tuple[str,int]:
 	try:
@@ -28,9 +28,9 @@ def cursesMain(stdscr:curses.window,args):
 	curses.start_color()
 
 	if args.command=="create":
-		con=core.ServerConsole(stdscr,args)
+		con=ServerConsole(stdscr,args)
 	else:
-		con=core.ClientConsole(stdscr,args)
+		con=ClientConsole(stdscr,args)
 
 	stdscr.refresh()
 	con.start()

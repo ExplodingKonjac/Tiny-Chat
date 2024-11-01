@@ -1,17 +1,16 @@
-from setuptools import setup, find_packages
+import setuptools
 
-setup(
-	name="Tiny Chat",
+setuptools.setup(
+	name="tinychat",
 	version="0.1.0",
 	author="ExplodingKonjac",
 	description="A simple chat program in LAN",
 	long_description=open("README.md").read(),
 	long_description_content_type="text/markdown",
 	url="https://github.com/ExplodingKonjac/Tiny-Chat",
-	packages=find_packages(),
+	packages=setuptools.find_packages(),
 	install_requires=[
-		"wcwidth>=0.2.5",
-		"curses"
+		"wcwidth>=0.2.5"
 	],
 	classifiers=[
 		"Programming Language :: Python :: 3",
