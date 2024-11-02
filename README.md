@@ -6,7 +6,13 @@
 pip install .
 ```
 
-也可以通过设置 pip 选项来更改安装位置。该命令会安装可执行文件 `tinychat`，可能需要根据可执行文件的安装路径设置 PATH。
+或者这样设置安装路径：
+
+```
+pip install --prefix="/your/custom/path/" .
+```
+
+执行完命令后，可执行文件 `tinychat` 会被安装在 `install_prefix/local/bin/` 下，其中 `install_prefix` 是默认安装路径或通过 `--prefix` 设置的路径。你可能需要根据安装路径设置 PATH 环境变量。
 
 
 注意：在 Windows 下，需要先安装 `windows-curses` 包：
@@ -29,7 +35,7 @@ tinychat --help
 tinychat subcommand --help
 ```
 
-进入 chat 界面之后，键入 `:` 后可以输入消息，键入 `/` 后可以输入命令（注意要在英文输入状态键入）。
+进入 chat 界面之后，键入 `:` 后可以输入消息，键入 `/` 后可以输入命令。
 
 ### 命令
 

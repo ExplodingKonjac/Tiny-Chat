@@ -46,20 +46,27 @@ class BaseConsole:
 	def refresh(self):
 		self.stdscr.erase()
 
-		if self.height<4:
+		if self.height<4 or self.width<4:
 			self.stdscr.addstr(0,0,"WINDOW SIZE TOO SMALL!",color(curses.COLOR_WHITE,curses.COLOR_RED)|curses.A_BOLD)
-		elif self.in_edit_mode:
-			self.display.resize(self.height-min(self.editor.height,self.editor.pad.getmaxyx()[0])-2,-1)
-			self.display.update()
-			self.editor.update()
 		else:
-			self.display.resize(self.height-1,-1)
-			self.display.update()
+			title=self.args.name
+			if len(title)>self.width-2:
+				title=title[:self.width-6]+'...'
+			self.stdscr.addstr(0,(self.width-len(title))//2,title,curses.A_BOLD)
+
+			if self.in_edit_mode:
+				self.display.resize(self.height-min(self.editor.height,self.editor.pad.getmaxyx()[0])-2,-1)
+				self.editor.update()
+			else:
+				self.display.resize(self.height-1,-1)
+			self.display.update()			
 	
 		self.stdscr.refresh()
 
+		curses.ACS_BULLET
+
 	def keyEventLoop(self):
-		# self.stdscr.timeout(50)
+		self.stdscr.timeout(50)
 		while self.running:
 			try:
 				key=self.stdscr.get_wch()
@@ -69,24 +76,14 @@ class BaseConsole:
 			if key==curses.KEY_RESIZE:
 				self.height,self.width=self.stdscr.getmaxyx()
 				with self.window_lock:
-					if self.height>=4:
+					if self.height>=4 and self.width>=4:
 						self.editor.resize(self.height//2-1,self.width)
 						self.editor.move(self.height,0)
 						self.display.resize(self.height-1,self.width-2)
 						self.display.move(1,1)
 					self.refresh()
 
-			elif key in (':','/'):
-				self.in_edit_mode=True
-				self.editor.initEditor(key)
-				self.refresh()
-				curses.curs_set(1)
-
-			elif key==curses.KEY_MOUSE or not self.in_edit_mode:
-				self.display.sendKey(key)
-				self.refresh()
-
-			elif self.in_edit_mode:
+			elif self.in_edit_mode and key!=curses.KEY_MOUSE:
 				ret=self.editor.sendKey(key)
 				if isinstance(ret,str):
 					self.in_edit_mode=False
@@ -97,6 +94,23 @@ class BaseConsole:
 						else:
 							self.sendCommand(ret)
 				self.refresh()
+
+			elif key==':' or key=='：':
+				self.in_edit_mode=True
+				self.editor.initEditor(':')
+				self.refresh()
+				curses.curs_set(1)
+			
+			elif key=='/':
+				self.in_edit_mode=True
+				self.editor.initEditor('/')
+				self.refresh()
+				curses.curs_set(1)
+
+			else:
+				self.display.sendKey(key)
+				self.refresh()
+
 
 	@abc.abstractmethod
 	def start(self)->str|None:...
@@ -150,10 +164,10 @@ class ServerConsole(BaseConsole):
 					sendSocket(client_socket,"access denied: duplicated username".encode())
 					return
 				self.clients[username]=client_socket
-			sendSocket(client_socket,MSG_GRANTED.to_bytes(1))
+			sendSocket(client_socket,MSG_GRANTED.to_bytes(1)+self.args.name.encode())
 
 			joined=True
-			self.broadcast(MSG_SYSTEM,"System",f"{username} has join the room.",client_socket)
+			self.broadcast(MSG_SYSTEM,"System",f"{username} has joined the room.",client_socket)
 
 			while self.running:
 				readable,_,_=select.select([client_socket],[],[],0.1)
@@ -199,7 +213,7 @@ class ServerConsole(BaseConsole):
 
 			with self.window_lock:
 				self.display.pushText(messageHeader(MSG_SYSTEM,"System"))
-				self.display.pushText([f"Room {self.args.name} has opened on port {self.args.port}."])
+				self.display.pushText([f"Room '{self.args.name}' has opened on port {self.args.port}."])
 				self.display.pushText([])
 				self.refresh()
 
@@ -270,6 +284,11 @@ class ClientConsole(BaseConsole):
 			if not res or res[0]!=MSG_GRANTED:
 				self.error_msg=res.decode()
 				return
+			self.args.name=res[1:].decode()
+			
+			self.display.pushText(messageHeader(MSG_SYSTEM,"System"))
+			self.display.pushText([f"You have joined the room '{self.args.name}' at {self.args.address[0]}:{self.args.address[1]}\n"])
+			self.refresh()
 
 			client_thread=threading.Thread(target=self.clientLoop,args=(client_socket,))
 			client_thread.start()

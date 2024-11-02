@@ -30,8 +30,8 @@ class Editor:
 				return ''.join(self.buffer[1:])
 
 			elif key.isprintable():
-				self.cursor_pos+=1
 				self.buffer.insert(self.cursor_pos,key)
+				self.cursor_pos+=1
 				self.updatePad()
 	
 		elif isinstance(key,int):

@@ -7,6 +7,7 @@ setuptools.setup(
 	description="A simple chat program in LAN",
 	long_description=open("README.md").read(),
 	long_description_content_type="text/markdown",
+	license="GPLv3",
 	url="https://github.com/ExplodingKonjac/Tiny-Chat",
 	packages=setuptools.find_packages(),
 	install_requires=[
