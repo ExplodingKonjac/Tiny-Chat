@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
 	name="tinychat",
-	version="0.1.0",
+	version="0.2.0",
 	author="ExplodingKonjac",
 	description="A simple chat program in LAN",
 	long_description=open("README.md").read(),

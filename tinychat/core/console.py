@@ -46,13 +46,17 @@ class BaseConsole:
 	def refresh(self):
 		self.stdscr.erase()
 
-		if self.height<4 or self.width<4:
+		if self.height<4 or self.width<25:
 			self.stdscr.addstr(0,0,"WINDOW SIZE TOO SMALL!",color(curses.COLOR_WHITE,curses.COLOR_RED)|curses.A_BOLD)
 		else:
+			extra=2 if self.display.new_message else 0
 			title=self.args.name
-			if len(title)>self.width-2:
-				title=title[:self.width-6]+'...'
-			self.stdscr.addstr(0,(self.width-len(title))//2,title,curses.A_BOLD)
+			if len(title)+extra>self.width-2:
+				title=title[:self.width-6-extra]+'...'
+			pos=(self.width-len(title)-extra)//2
+			self.stdscr.addstr(0,pos+extra,title,curses.A_BOLD)
+			if extra:
+				self.stdscr.addch(0,pos,'●',color(curses.COLOR_RED,curses.COLOR_BLACK)|curses.A_BOLD)
 
 			if self.in_edit_mode:
 				self.display.resize(self.height-min(self.editor.height,self.editor.pad.getmaxyx()[0])-2,-1)
@@ -76,7 +80,7 @@ class BaseConsole:
 			if key==curses.KEY_RESIZE:
 				self.height,self.width=self.stdscr.getmaxyx()
 				with self.window_lock:
-					if self.height>=4 and self.width>=4:
+					if self.height>=4 and self.width>=25:
 						self.editor.resize(self.height//2-1,self.width)
 						self.editor.move(self.height,0)
 						self.display.resize(self.height-1,self.width-2)
@@ -204,6 +208,7 @@ class ServerConsole(BaseConsole):
 			self.running=False
 			for thread in threads:
 				thread.join()
+			server_socket.close()
 
 	def start(self):
 		try:
@@ -261,6 +266,7 @@ class ClientConsole(BaseConsole):
 			self.error_msg=', '.join(map(str,e.args))
 		finally:
 			self.running=False
+			client_socket.close()
 	
 	def start(self):
 		try:

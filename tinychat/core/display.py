@@ -11,6 +11,7 @@ class Display:
 		self.pad=curses.window=curses.newpad(1,width)
 		self.begin_row=0
 		self.actual_height=0
+		self.new_message=False
 
 	def scrollUp(self,dt:int):
 		if self.actual_height>=self.height:
@@ -19,6 +20,8 @@ class Display:
 	def scrollDown(self,dt:int):
 		if self.actual_height>=self.height:
 			self.begin_row=min(self.begin_row+dt,self.actual_height-self.height)
+			if self.begin_row==self.actual_height-self.height:
+				self.new_message=False
 
 	def sendKey(self,key:int|str):
 		if isinstance(key,int):
@@ -57,6 +60,8 @@ class Display:
 		self.actual_height+=dt_height
 		if is_latest:
 			self.begin_row=max(0,self.actual_height-self.height)
+		else:
+			self.new_message=True
 
 	def move(self,pos_y:int,pos_x:int):
 		self.pos_y=pos_y
