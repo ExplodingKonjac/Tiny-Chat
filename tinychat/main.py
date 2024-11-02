@@ -3,7 +3,7 @@ import argparse
 import hashlib
 import signal
 
-from .core import *
+from core import *
 
 def parseAddress(value:str)->tuple[str,int]:
 	try:
@@ -53,7 +53,7 @@ def main():
 	join_parser.add_argument("username",type=str,help="the username you want to use")
 
 	args=parser.parse_args()
-	raw_password=input(f"Please {'set' if args.command=="create" else 'enter'} the password (or leave it empty): ")
+	raw_password=input(f"Please {'set' if args.command=='create' else 'enter'} the password (or leave it empty): ")
 	args.secretkey=hashlib.sha256(raw_password.encode()).digest()
 	del raw_password
 
