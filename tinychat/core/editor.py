@@ -25,7 +25,15 @@ class Editor:
 		self.updatePad()
 	
 	def sendKey(self,key:int|str)->str|None:
-		if isinstance(key,str):
+		if key==curses.KEY_BACKSPACE or key==127 or key=='\b':
+			if self.cursor_pos>1:
+				self.cursor_pos-=1
+				self.buffer.pop(self.cursor_pos)
+				self.updatePad()
+			elif len(self.buffer)==1:
+				return ''
+
+		elif isinstance(key,str):
 			if key=='\n' or key=='\r':
 				return ''.join(self.buffer[1:])
 
@@ -34,33 +42,24 @@ class Editor:
 				self.cursor_pos+=1
 				self.updatePad()
 	
-		elif isinstance(key,int):
-			if key==curses.KEY_BACKSPACE or key==127:
-				if self.cursor_pos>1:
-					self.cursor_pos-=1
-					self.buffer.pop(self.cursor_pos)
-					self.updatePad()
-				elif len(self.buffer)==1:
-					return ''
-	
-			elif key==curses.KEY_DC:
-				if self.cursor_pos<len(self.buffer):
-					self.buffer.pop(self.cursor_pos)
-					self.updatePad()
-	
-			elif key==curses.KEY_LEFT:
-				if self.cursor_pos>1:
-					self.cursor_pos-=1
-	
-			elif key==curses.KEY_RIGHT:
-				if self.cursor_pos<len(self.buffer):
-					self.cursor_pos+=1
+		elif key==curses.KEY_DC:
+			if self.cursor_pos<len(self.buffer):
+				self.buffer.pop(self.cursor_pos)
+				self.updatePad()
 
-			elif key==curses.KEY_HOME:
-				self.cursor_pos=1
+		elif key==curses.KEY_LEFT:
+			if self.cursor_pos>1:
+				self.cursor_pos-=1
 
-			elif key==curses.KEY_END:
-				self.cursor_pos=len(self.buffer)
+		elif key==curses.KEY_RIGHT:
+			if self.cursor_pos<len(self.buffer):
+				self.cursor_pos+=1
+
+		elif key==curses.KEY_HOME:
+			self.cursor_pos=1
+
+		elif key==curses.KEY_END:
+			self.cursor_pos=len(self.buffer)
 
 		return None
 	
