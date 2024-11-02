@@ -67,8 +67,6 @@ class BaseConsole:
 	
 		self.stdscr.refresh()
 
-		curses.ACS_BULLET
-
 	def keyEventLoop(self):
 		self.stdscr.timeout(50)
 		while self.running:

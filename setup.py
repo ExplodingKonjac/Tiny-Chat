@@ -5,11 +5,14 @@ setuptools.setup(
 	version="0.2.0",
 	author="ExplodingKonjac",
 	description="A simple chat program in LAN",
-	long_description=open("README.md").read(),
+	long_description=open("README.md",encoding="UTF-8").read(),
 	long_description_content_type="text/markdown",
 	license="GPLv3",
 	url="https://github.com/ExplodingKonjac/Tiny-Chat",
-	packages=setuptools.find_packages(),
+	packages=[
+		"tinychat",
+		"tinychat.core"
+	],
 	install_requires=[
 		"wcwidth>=0.2.5"
 	],

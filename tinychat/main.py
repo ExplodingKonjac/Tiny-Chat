@@ -3,7 +3,7 @@ import argparse
 import hashlib
 import signal
 
-from core import *
+from .core import *
 
 def parseAddress(value:str)->tuple[str,int]:
 	try:
