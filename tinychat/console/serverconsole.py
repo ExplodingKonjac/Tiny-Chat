@@ -1,0 +1,113 @@
+from .baseconsole import *
+
+class ServerConsole(BaseConsole):
+	def __init__(self,stdscr:curses.window,args):
+		super().__init__(stdscr,args)
+
+		self.clients:dict[str,socket.socket]={}
+		self.clients_lock=threading.Lock()
+
+	def broadcast(self,msg_type:int,msg_sender:str,msg:str,exclude:None|socket.socket=None):
+		data=msg_type.to_bytes(1)+(msg_sender+'\0'+msg).encode()
+		with self.clients_lock:
+			for s in self.clients.values():
+				if s==exclude:
+					continue
+				sendSocket(s,data)
+
+		with self.window_lock:
+			self.display.pushText(messageHeader(msg_type,msg_sender))
+			self.display.pushText([msg,'\n'])
+			self.refresh()
+
+	def handleClient(self,client_socket:socket.socket,client_address):
+		username=''
+		joined=False
+		try:
+			if len(self.clients)+1==self.args.capacity:
+				sendSocket(client_socket,"access denied: out of room capacity".encode())
+				return
+			sendSocket(client_socket,MSG_GRANTED.to_bytes(1))
+
+			client_key=readSocket(client_socket)
+			if client_key!=self.args.secretkey:
+				sendSocket(client_socket,"access denied: incorrect password".encode())
+				return
+			sendSocket(client_socket,MSG_GRANTED.to_bytes(1))
+
+			username=readSocket(client_socket).decode()
+			with self.clients_lock:
+				if username in self.clients or username==self.args.username:
+					sendSocket(client_socket,"access denied: duplicated username".encode())
+					return
+				self.clients[username]=client_socket
+			sendSocket(client_socket,MSG_GRANTED.to_bytes(1)+self.args.name.encode())
+
+			joined=True
+			self.broadcast(MSG_SYSTEM,"System",f"{username} has joined the room.",client_socket)
+
+			while self.running:
+				readable,_,_=select.select([client_socket],[],[],0.1)
+				if readable:
+					msg=readSocket(client_socket).decode()
+					if not msg:
+						break
+					self.broadcast(MSG_USER,username,msg,client_socket)
+		except:
+			sendSocket(client_socket,MSG_EXIT.to_bytes(1))
+		finally:
+			if joined:
+				with self.clients_lock:
+					self.clients.pop(username)
+				self.broadcast(MSG_SYSTEM,"System",f"{username} has left the room.",client_socket)
+
+			client_socket.close()
+
+	def serverLoop(self,server_socket:socket.socket):
+		threads=[]
+		try:
+			server_socket.listen(5)
+			while self.running:
+				readable,_,_=select.select([server_socket],[],[],0.1)
+				if readable:
+					client_socket,client_address=server_socket.accept()
+					thread=threading.Thread(target=self.handleClient,args=(client_socket,client_address))
+					thread.start()
+					threads.append(thread)
+
+		except Exception as e:
+			self.error_msg=', '.join(map(str,e.args))
+		finally:
+			self.running=False
+			for thread in threads:
+				thread.join()
+
+	def start(self):
+		server_socket=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+		try:
+			server_socket.bind(('0.0.0.0',self.args.port))
+			self.args.port=server_socket.getsockname()[1]
+
+			with self.window_lock:
+				self.display.pushText(messageHeader(MSG_SYSTEM,"System"))
+				self.display.pushText([f"Room '{self.args.name}' has opened on port {self.args.port}."])
+				self.display.pushText([])
+				self.refresh()
+
+			server_thread=threading.Thread(target=self.serverLoop,args=(server_socket,))
+			server_thread.start()
+
+			self.keyEventLoop()
+			server_thread.join()
+
+		except Exception as e:
+			self.error_msg=', '.join(map(str,e.args))
+		finally:
+			self.running=False
+			server_socket.close()
+
+	def sendMessage(self,msg:str):
+		self.broadcast(MSG_ADMIN,self.args.username,msg)
+		with self.window_lock:
+			self.display.scrollDown(2**30)
+			self.refresh()

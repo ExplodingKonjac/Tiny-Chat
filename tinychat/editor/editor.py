@@ -1,4 +1,4 @@
-from .basic import *
+from ..basic.graphics import *
 
 class Editor:
 	def __init__(self,stdscr:curses.window,pos_y:int,pos_x:int,height:int,width:int):

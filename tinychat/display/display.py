@@ -1,4 +1,4 @@
-from .basic import *
+from ..basic.graphics import *
 
 class Display:
 	def __init__(self,stdscr:curses.window,pos_y:int,pos_x:int,height:int,width:int):
@@ -43,6 +43,12 @@ class Display:
 
 			elif key==curses.KEY_NPAGE:
 				self.scrollDown(self.height)
+			
+			elif key==curses.KEY_HOME:
+				self.scrollUp(10**9)
+			
+			elif key==curses.KEY_END:
+				self.scrollDown(10**9)
 
 	def pushText(self,text:list[str|int]):
 		self.texts.append(text)
