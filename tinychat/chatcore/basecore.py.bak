@@ -5,8 +5,7 @@ import select
 import threading
 import time
 
-from ..display import *
-from ..editor import *
+from ..gui import *
 from ..basic.network import *
 from ..basic.graphics import *
 
@@ -23,7 +22,7 @@ def messageHeader(msg_type:int,msg_sender:str):
 		ret[0]|=color(curses.COLOR_GREEN,curses.COLOR_BLACK)
 	return ret
 
-class BaseConsole:
+class BaseCore:
 	def __init__(self,stdscr:curses.window,args):
 		self.stdscr=stdscr
 		self.args=args

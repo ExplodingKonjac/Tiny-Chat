@@ -1,12 +1,5 @@
 import socket
 
-MSG_SYSTEM=1
-MSG_USER=2
-MSG_ADMIN=3
-MSG_SELF=4
-MSG_EXIT=5
-MSG_GRANTED=6
-
 def readSocket(s:socket.socket)->bytes:
 	length_bytes=s.recv(4)
 	if len(length_bytes)!=4:

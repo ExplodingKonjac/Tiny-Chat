@@ -1,6 +1,6 @@
-from .baseconsole import *
+from .basecore import *
 
-class ClientConsole(BaseConsole):
+class ClientCore(BaseCore):
 	def __init__(self,stdscr:curses.window,args):
 		super().__init__(stdscr,args)
 
