@@ -1,2 +1,3 @@
 from .editor import Editor
-from .display import Display
+from .textbox import Textbox
+from .mainwindow import MainWindow

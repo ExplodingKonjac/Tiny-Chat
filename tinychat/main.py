@@ -1,7 +1,7 @@
 import curses
-import argparse
 import hashlib
 import signal
+import getpass
 
 from .basic.settings import *
 from .chatcore import *
@@ -14,24 +14,22 @@ def cursesMain(stdscr:curses.window,args):
 	curses.start_color()
 
 	if args.command=="create":
-		con=ServerConsole(stdscr,args)
+		win=MainWindow(stdscr,ServerCore)
 	else:
-		con=ClientConsole(stdscr,args)
+		win=MainWindow(stdscr,ClientCore)
 
 	stdscr.refresh()
-	con.start()
-	return con.error_msg
+	return win.main()
 
 def main():
 	signal.signal(signal.SIGINT,signal.SIG_IGN)
 
 	parseArgs()
 
-	raw_password=input(f"Please {'set' if args.command=='create' else 'enter'} the password (or leave it empty): ")
-	args.secretkey=hashlib.sha256(raw_password.encode()).digest()
-	del raw_password
+	prompt=f"Please {'set' if args().command=='create' else 'enter'} the password (or leave it empty): "
+	args().secretkey=hashlib.sha256(getpass.getpass(prompt).encode()).digest()
 
-	error_msg=curses.wrapper(cursesMain,args)
+	error_msg=curses.wrapper(cursesMain,args())
 	if error_msg:
 		print(f"error: {error_msg}")
 

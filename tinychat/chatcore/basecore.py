@@ -2,22 +2,36 @@ import abc
 import socket
 import select
 import threading
+import enum
 from typing import Callable
 
-from ..basic.network import *
 from ..basic.settings import *
+from ..basic.network import *
 
 MSG_SYSTEM=1
 MSG_USER=2
 MSG_ADMIN=3
 MSG_SELF=4
-CMD_EXIT=5
-CMD_GRANTED=6
-QRY_USERLIST=7
+MSG_NEWUSER=5
+MSG_USERLEFT=6
+
+CMD_EXIT=101
+CMD_GRANTED=102
+
+QRY_USERLIST=201
 
 class BaseCore(abc.ABC):
-	def __init__(self,on_new_message:Callable[[int,str,str],None]):
+	def __init__(self,*,
+				 on_new_message:Callable[[int,str,str],None],
+				 on_join_room:Callable[[tuple[str,int],str],None],
+				 on_left_room:Callable[[],None],
+				 on_new_user:Callable[[tuple[str,int],str],None],
+				 on_user_left:Callable[[str,bool],None]):
 		self._onNewMessage=on_new_message
+		self._onJoinRoom=on_join_room
+		self._onLeftRoom=on_left_room
+		self._onNewUser=on_new_user
+		self._onUserLeft=on_user_left
 
 		self._running=False
 		self._error_msg=''
@@ -35,3 +49,11 @@ class BaseCore(abc.ABC):
 
 	@abc.abstractmethod
 	def queryUserList(self)->list[str]:...
+
+	@property
+	def error_msg(self):
+		return self._error_msg
+	
+	@property
+	def running(self):
+		return self._running

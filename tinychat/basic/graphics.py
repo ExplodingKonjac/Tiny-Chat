@@ -3,16 +3,15 @@ import wcwidth
 
 from typing import Sequence
 
-color_dict:dict[tuple[int,int],int]={}
+__color_dict:dict[tuple[int,int],int]={}
 
 def color(fg:int,bg:int)->int:
-	if (fg,bg) in color_dict.keys():
-		return curses.color_pair(color_dict[(fg,bg)])
+	if (fg,bg) in __color_dict.keys():
+		res=__color_dict[(fg,bg)]
 	else:
-		x=len(color_dict)+1
-		curses.init_pair(x,fg,bg)
-		color_dict[(fg,bg)]=x
-		return curses.color_pair(x)
+		res=__color_dict[(fg,bg)]=len(__color_dict)+1
+		curses.init_pair(res,fg,bg)
+	return curses.color_pair(res)
 
 def drawText(text_seq:Sequence[str|int],width:int)->curses.window:
 	pad=curses.newpad(1,width+1)

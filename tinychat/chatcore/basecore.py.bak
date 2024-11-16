@@ -9,19 +9,6 @@ from ..gui import *
 from ..basic.network import *
 from ..basic.graphics import *
 
-def messageHeader(msg_type:int,msg_sender:str):
-	time_str=time.strftime("%Y-%m-%d %H:%M:%S",time.localtime())
-	ret=[curses.A_BOLD,msg_sender,color(curses.COLOR_CYAN,curses.COLOR_BLACK),' ',time_str]
-	if msg_type==MSG_SYSTEM:
-		ret[0]|=color(curses.COLOR_MAGENTA,curses.COLOR_BLACK)
-	elif msg_type==MSG_USER:
-		ret[0]|=color(curses.COLOR_YELLOW,curses.COLOR_BLACK)
-	elif msg_type==MSG_ADMIN:
-		ret[0]|=color(curses.COLOR_RED,curses.COLOR_BLACK)
-	elif msg_type==MSG_SELF:
-		ret[0]|=color(curses.COLOR_GREEN,curses.COLOR_BLACK)
-	return ret
-
 class BaseCore:
 	def __init__(self,stdscr:curses.window,args):
 		self.stdscr=stdscr
